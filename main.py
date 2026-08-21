@@ -6,6 +6,7 @@ params = {
     "fecha_inicio": "2026-08-01",
     "fecha_final": "2026-08-19",
     "exportar_trimestre": False,
+    "fecha":"10-08-26"
 }
 
 res = execute(params)

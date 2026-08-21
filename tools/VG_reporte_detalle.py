@@ -38,7 +38,7 @@ COLS_SALIDA_DETALLE = [
     "dif_utilidad", "minimov2", "inv_une", "dias_inv_une", "inv_aldis", "dias_inv_aldis",
     "cantidadinventario_act", "cantidadinventario_aa",
 ]
-# Igual que COLS_SALIDA_DETALLE pero sin 'mes' (el libro general no distingue mes)
+
 COLS_SALIDA_GENERAL = [c for c in COLS_SALIDA_DETALLE if c not in ("mes", "sucursal")]
  
 PRIORIDAD_BASICO_MODA = {"basico": 1, "basico-moda": 2, "moda": 3}
@@ -52,7 +52,14 @@ CLASIFICACION_BASICO_MODA = {v: k for k, v in PRIORIDAD_BASICO_MODA.items()}
 def execute(params_u: dict) -> int:
     params = assign_parameters(**params_u)
     dfs_por_sucursal, df_general = logic(**params)
-    export(dfs_por_sucursal, df_general)
+    export(
+        dfs_por_sucursal,
+        df_general,
+        fecha=params["fecha_sufijo"],
+        prefijo=params["nombre_prefijo"],
+        separador=["separador"],
+        subcarpeta=params["subcarpeta"]
+    )
     return 0
  
  
@@ -63,6 +70,10 @@ def assign_parameters(**params_u) -> dict:
         "exportar_trimestre": params_u.get("exportar_trimestre", False),
         "fecha_inicio": pd.to_datetime(params_u.get("fecha_inicio")),
         "fecha_final": pd.to_datetime(params_u.get("fecha_final")),
+        "fecha_sufijo":  params_u.get("fecha_sufijo",pd.Timestamp.today().strftime("%d-%m-%y")),
+        "nombre_prefijo": params_u.get("nombre_prefijo","VG Det x SKU"),
+        "subcarpeta": params_u.get("subcarpeta","HUB_Output"),
+        "separador": params_u.get("separador", " - ")
     }
  
  
@@ -319,8 +330,8 @@ def logic(dias_transcurridos, dias_laborales, exportar_trimestre, fecha_inicio, 
     )
     df_merge_info = df_merge_info.merge(df_basico_moda, how="left", on=["codigo", "sucursal"], validate="many_to_one")
     df_merge_info = df_merge_info[COLS_SALIDA_DETALLE]
- 
-    dfs_por_sucursal = {sucursal: grupo.copy() for sucursal, grupo in df_merge_info.groupby("sucursal")}
+    # cambio
+    dfs_por_sucursal = {sucursal: grupo.copy().drop(columns=["mes", "sucursal"]) for sucursal, grupo in df_merge_info.groupby("sucursal")}
  
     df_general = _construir_libro_general(
         df_merge_info, dias_transcurridos, dias_laborales, num_sucursales=len(dfs_por_sucursal)
@@ -341,23 +352,20 @@ def exportar_excel(df: pd.DataFrame, archivo_excel: Path) -> None:
             df_categoria.to_excel(writer, sheet_name=nombre_hoja, index=False)
  
  
-def export(dfs: dict, df_g: pd.DataFrame, subcarpeta: str = "HUB_Output", fecha: str | None = None) -> None:
+def export(dfs: dict, df_g: pd.DataFrame, subcarpeta: str, fecha: str, prefijo: str, separador: str) -> None:
     """Exporta un Excel por sucursal + un Excel GENERAL.
  
     `fecha` es el sufijo que se usa en el nombre de archivo (formato DD-MM-AA).
     Si no se especifica, se usa la fecha de hoy para no sobrescribir corridas
     de días distintos con el mismo nombre.
     """
-    separador = " - "
-    sufijo = "VG Det x SKU"
-    fecha = fecha or pd.Timestamp.today().strftime("%d-%m-%y")
  
     ruta_salida = Path(__file__).resolve().parent.parent / "data" / subcarpeta
     ruta_salida.mkdir(parents=True, exist_ok=True)
  
     for sucursal, df_sucursal in dfs.items():
-        archivo_excel = ruta_salida / f"{sufijo}{separador}{fecha}{separador}{sucursal}.xlsx"
+        archivo_excel = ruta_salida / f"{prefijo}{separador}{fecha}{separador}{sucursal}.xlsx"
         exportar_excel(df_sucursal, archivo_excel)
  
-    archivo_general = ruta_salida / f"{sufijo}{separador}{fecha}{separador}GENERAL.xlsx"
+    archivo_general = ruta_salida / f"{prefijo}{separador}{fecha}{separador}GENERAL.xlsx"
     exportar_excel(df_g, archivo_general)
