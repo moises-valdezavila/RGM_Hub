@@ -1,0 +1,11 @@
+# Entorno virtual
+.venv/
+
+
+# Python
+__pycache__/
+*.pyc
+
+# Archivos sensibles
+to_sql.py
+HUB_Output/
