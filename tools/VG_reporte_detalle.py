@@ -49,18 +49,24 @@ CLASIFICACION_BASICO_MODA = {v: k for k, v in PRIORIDAD_BASICO_MODA.items()}
 # Entrada / parámetros
 # ---------------------------------------------------------------------------
  
-def execute(params_u: dict) -> int:
+def execute(params_u: dict) -> str:
     params = assign_parameters(**params_u)
-    dfs_por_sucursal, df_general = logic(**params)
+    dfs_por_sucursal, df_general = logic(
+        dias_transcurridos = params["dias_transcurridos"], 
+        dias_laborales = params["dias_laborales"], 
+        exportar_trimestre = params["exportar_trimestre"], 
+        fecha_inicio = params["fecha_inicio"], 
+        fecha_final = params["fecha_final"]
+    )
     export(
         dfs_por_sucursal,
         df_general,
         fecha=params["fecha_sufijo"],
         prefijo=params["nombre_prefijo"],
-        separador=["separador"],
+        separador=params["separador"],
         subcarpeta=params["subcarpeta"]
     )
-    return 0
+    return "Finalizado"
  
  
 def assign_parameters(**params_u) -> dict:
