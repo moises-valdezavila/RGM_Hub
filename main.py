@@ -1,4 +1,5 @@
-from tools.VG_reporte_detalle import ReportParams, execute
+from tools.report_params import ReportParams
+from tools.VG_reporte_detalle import execute
 
 params = ReportParams(
     dias_transcurridos=16,
