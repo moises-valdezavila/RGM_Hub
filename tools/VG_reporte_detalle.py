@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -7,30 +9,45 @@ from datetime import datetime
 from services.to_sql import sp_vg_MSV, descargar_tabla, sp_inv
 from data.map import map_almacen
 
-def execute(params_u):
-    params = assign_parameters(**params_u)
-    return logic(**params)
+
+@dataclass(frozen=True)
+class ReportParams:
+    dias_transcurridos: int
+    dias_laborales: int
+    fecha_inicio: str | pd.Timestamp
+    fecha_final: str | pd.Timestamp
+    exportar_trimestre: bool = False
+
+    def __post_init__(self):
+        if self.dias_transcurridos is None or self.dias_laborales is None:
+            raise ValueError("dias_transcurridos y dias_laborales son requeridos.")
+
+        if self.dias_transcurridos <= 0:
+            raise ValueError("dias_transcurridos debe ser mayor que 0.")
+
+        if self.dias_laborales <= 0:
+            raise ValueError("dias_laborales debe ser mayor que 0.")
+
+        fecha_inicio = pd.to_datetime(self.fecha_inicio)
+        fecha_final = pd.to_datetime(self.fecha_final)
+
+        if pd.isna(fecha_inicio):
+            raise ValueError("fecha_inicio no es una fecha válida.")
+
+        if pd.isna(fecha_final):
+            raise ValueError("fecha_final no es una fecha válida.")
+
+        if fecha_final < fecha_inicio:
+            raise ValueError("fecha_inicio debe ser menor o igual a fecha_final.")
+
+        object.__setattr__(self, "fecha_inicio", fecha_inicio)
+        object.__setattr__(self, "fecha_final", fecha_final)
 
 
-def assign_parameters(**params_u):
-
-    dias_transcurridos = params_u.get("dias_transcurridos")
-    dias_laborales = params_u.get("dias_laborales")
-
-    exportar_trimestre = params_u.get("exportar_trimestre", False)
-
-    fecha_inicio = pd.to_datetime(params_u.get("fecha_inicio"))
-
-    fecha_final = pd.to_datetime(params_u.get("fecha_final"))
-    
-
-    return {
-        "dias_transcurridos": dias_transcurridos,
-        "dias_laborales": dias_laborales,
-        "exportar_trimestre": exportar_trimestre,
-        "fecha_inicio": fecha_inicio,
-        "fecha_final": fecha_final,
-    }
+def execute(params):
+    if not isinstance(params, ReportParams):
+        raise TypeError("execute espera una instancia de ReportParams.")
+    return logic(**params.__dict__)
 
 def logic(
     dias_transcurridos,
