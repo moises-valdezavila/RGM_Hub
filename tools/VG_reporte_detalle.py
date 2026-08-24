@@ -6,39 +6,22 @@ import os
 from datetime import datetime
 from services.to_sql import sp_vg_MSV, descargar_tabla, sp_inv
 from data.map import map_almacen
-
-def execute(params_u):
-    params = assign_parameters(**params_u)
-    return logic(**params)
+from tools.report_params import ReportParams
 
 
-def assign_parameters(**params_u):
+def execute(params):
+    if not isinstance(params, ReportParams):
+        raise TypeError("execute espera una instancia de ReportParams.")
+    return logic(params)
 
-    dias_transcurridos = params_u.get("dias_transcurridos")
-    dias_laborales = params_u.get("dias_laborales")
 
-    exportar_trimestre = params_u.get("exportar_trimestre", False)
+def logic(params: ReportParams):
+    dias_transcurridos = params.dias_transcurridos
+    dias_laborales = params.dias_laborales
+    exportar_trimestre = params.exportar_trimestre
+    fecha_inicio = params.fecha_inicio
+    fecha_final = params.fecha_final
 
-    fecha_inicio = pd.to_datetime(params_u.get("fecha_inicio"))
-
-    fecha_final = pd.to_datetime(params_u.get("fecha_final"))
-    
-
-    return {
-        "dias_transcurridos": dias_transcurridos,
-        "dias_laborales": dias_laborales,
-        "exportar_trimestre": exportar_trimestre,
-        "fecha_inicio": fecha_inicio,
-        "fecha_final": fecha_final,
-    }
-
-def logic(
-    dias_transcurridos,
-    dias_laborales,
-    exportar_trimestre,
-    fecha_inicio,
-    fecha_final
-):
     fecha_inicial_aa = fecha_inicio - pd.DateOffset(years=1)
     fecha_final_aa = (fecha_final - pd.DateOffset(years=1) + pd.DateOffset(months=3)).replace(day=1) + pd.offsets.MonthEnd(0)
 
@@ -72,7 +55,7 @@ def logic(
         df_aa[['codigo','articulo','subcuenta','descripcion1','Color']]
             .drop_duplicates(subset=['codigo'])
     ]).drop_duplicates(subset=['codigo'])
-        
+
     df_group = df_act.groupby(['mes','sucursal','categoria','subcategoria','familia','codigo']).agg(
         {'VentaTotal_sin_Monedero': 'sum',
         'costototal': 'sum',
@@ -81,8 +64,8 @@ def logic(
     df_group_aa = df_aa.groupby(['mes','sucursal','categoria','subcategoria','familia','codigo']).agg(
         {'VentaTotal_sin_Monedero': 'sum',
         'costototal': 'sum',
-        'cantidadinventario':'sum'}).reset_index() 
-    
+        'cantidadinventario':'sum'}).reset_index()
+
     df_group_aa_mes_act = df_group_aa[df_group_aa['mes'].isin(df_group['mes'].unique())]
     df_merge = df_group.merge(
         df_group_aa_mes_act,
@@ -90,7 +73,7 @@ def logic(
         on=['mes','sucursal','categoria','subcategoria','familia','codigo'],
         suffixes=('_act', '_aa')
     ).fillna(0)
-    
+
     df_merge['margen_act'] = np.where(
         df_merge['VentaTotal_sin_Monedero_act'] != 0,
         (df_merge['VentaTotal_sin_Monedero_act'] - df_merge['costototal_act']) / df_merge['VentaTotal_sin_Monedero_act'],
@@ -111,7 +94,7 @@ def logic(
     df_merge['margen_tend_$'] = df_merge['tendencia_venta'] - df_merge['tendencia_costo']
     df_merge['margen_aa_$'] = df_merge['VentaTotal_sin_Monedero_aa'] - df_merge['costototal_aa']
     df_merge['dif_utilidad'] = df_merge['margen_act_$'] - df_merge['margen_aa_$']
-    
+
     #Calculo con trimestre siguiente del AA
     df_group_tri_aa = (
         df_aa[df_aa['mes'].isin(df_aa['mes'].unique()[-3:])].groupby(
@@ -155,7 +138,7 @@ def logic(
     # Calculo de venta actual en tendencia
     df_aux_dias_inv = df_act.groupby(['mes','sucursal','categoria','subcategoria','familia','codigo']).agg({'cantidadinventario': 'sum'}).reset_index()
     df_aux_dias_inv['minimov2_aux'] = df_aux_dias_inv['cantidadinventario'] / dias_transcurridos * dias_laborales
-    
+
     # Normalizar sucursales
     df_aux_dias_inv['sucursal'] = df_aux_dias_inv['sucursal'].str.upper()
 
@@ -190,7 +173,7 @@ def logic(
 
     df_merge_inv = df_merge_inv.rename(columns={'disponible': 'inv_une'})
     df_merge_inv = df_merge_inv.drop(columns='Almacen2')
-    
+
     df_inv_aldis = (
         df_inv[df_inv['Almacen2'] == 'ALDIS']
         .groupby('codigo', as_index=False)['disponible']
@@ -204,7 +187,7 @@ def logic(
         how='left'
     )
     df_merge_inv = df_merge_inv.rename(columns={'disponible': 'inv_aldis'}).fillna(0)
-    
+
     df_merge_inv = df_merge_inv[df_merge_inv['sucursal'].isin(['CAMPECHE', 'CENTRO', 'CHARLY', 'KABAH', 'NORTE'])]
     df_merge_inv['dias_inv_une'] = np.where(
         df_merge_inv['minimov2'] > 0,
@@ -231,14 +214,14 @@ def logic(
     df_merge_info = df_merge_inv.merge(datos_art, how='left', on=['codigo'], validate='many_to_one')
     df_b_m = df_inv[['codigo','Almacen2','basico_moda']].drop_duplicates(subset=['codigo','Almacen2']).rename(columns={'Almacen2': 'sucursal'})
     df_merge_info = df_merge_info.merge(df_b_m, how='left', on=['codigo','sucursal'], validate='many_to_one')
-    
+
     resultado = df_merge_info[['mes','sucursal','categoria','subcategoria','familia','codigo','articulo','subcuenta','descripcion1','Color','basico_moda',
                                    'VentaTotal_sin_Monedero_act','tendencia_venta','VentaTotal_sin_Monedero_aa','crecimiento_venta','diferencia_venta','margen_act',
                                    'dif_MC','margen_aa','costototal_act','costototal_aa','margen_act_$','margen_aa_$','margen_tend_$','dif_utilidad','minimov2',
                                    'inv_une','dias_inv_une','inv_aldis','dias_inv_aldis','cantidadinventario_act','cantidadinventario_aa']]
-    
-    
-    
+
+
+
     # # Estructura diccionario, df por sucursal
     # dfs_por_sucursal = {
     #     sucursal: grupo.copy()
@@ -250,9 +233,9 @@ def logic(
     # ruta_salida.mkdir(parents=True, exist_ok=True)
 
     # for sucursal, df_sucursal in dfs_por_sucursal.items():
-        
+
     #     archivo_excel = ruta_salida / f"{sucursal}.xlsx"
-        
+
     #     with pd.ExcelWriter(archivo_excel, engine="openpyxl") as writer:
     #         df_sucursal.to_excel(
     #             writer,
@@ -260,9 +243,9 @@ def logic(
     #             index=False
     #         )
     #         for categoria, df_categoria in df_sucursal.groupby('categoria'):
-                
+
     #             nombre_hoja = str(categoria)[:30]
-                
+
     #             df_categoria.to_excel(
     #                 writer,
     #                 sheet_name=nombre_hoja,
