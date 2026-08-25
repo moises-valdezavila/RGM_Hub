@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-
+from tools.report_params import ReportParams
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -463,30 +463,25 @@ class ReporteDetalleWindow(QDialog):
 
     def generar_reporte(self):
 
-        params = {
-            "dias_transcurridos": self.dias_transcurridos.value(),
-            "dias_laborales": self.dias_laborales.value(),
-            "exportar_trimestre": (
-                self.exportar_trimestre.isChecked()
-            ),
-
-            "fecha_inicio": (
+        params = ReportParams(
+            dias_transcurridos=self.dias_transcurridos.value(),
+            dias_laborales=self.dias_laborales.value(),
+            fecha_inicio=(
                 self.fecha_inicio
                 .date()
                 .toString("yyyy-MM-dd")
             ),
-
-            "fecha_final": (
+            fecha_final=(
                 self.fecha_final
                 .date()
                 .toString("yyyy-MM-dd")
             ),
-
-            "fecha_sufijo": self.fecha_sufijo.text(),
-            "nombre_prefijo": self.nombre_prefijo.text(),
-            "separador": self.separador.text(),
-            "subcarpeta": self.subcarpeta.text(),
-        }
+            exportar_trimestre=(self.exportar_trimestre.isChecked()),
+            fecha_sufijo=self.fecha_sufijo.text(),
+            nombre_prefijo=self.nombre_prefijo.text(),
+            separador=self.separador.text(),
+            subcarpeta=self.subcarpeta.text()
+        )
 
         print("Parámetros enviados:")
         print(params)
