@@ -9,7 +9,12 @@ class ReportParams:
     dias_laborales: int
     fecha_inicio: str | pd.Timestamp
     fecha_final: str | pd.Timestamp
+    fecha_sufijo: str
+    nombre_prefijo: str
+    separador: str
+    subcarpeta: str
     exportar_trimestre: bool = False
+    
 
     def __post_init__(self):
         if self.dias_transcurridos is None or self.dias_laborales is None:
@@ -21,6 +26,9 @@ class ReportParams:
         if self.dias_laborales <= 0:
             raise ValueError("dias_laborales debe ser mayor que 0.")
 
+        if self.dias_transcurridos > self.dias_laborales:
+            raise ValueError("dias_transcurridos no puede ser mayor que dias_laborales")
+        
         fecha_inicio = pd.to_datetime(self.fecha_inicio)
         fecha_final = pd.to_datetime(self.fecha_final)
 
