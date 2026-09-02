@@ -91,7 +91,7 @@ class ReporteDetalleWindow(QDialog):
 
         self.fecha_inicio.setDate(
             self.fecha_inicio.date().fromString(
-                "01/08/2026",
+                hoy.replace(day=1).strftime("%d/%m/%Y"),
                 "dd/MM/yyyy"
             )
         )

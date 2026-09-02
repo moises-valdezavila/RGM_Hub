@@ -7,5 +7,6 @@ __pycache__/
 *.pyc
 
 # Archivos sensibles
+.env
 to_sql.py
 HUB_Output/

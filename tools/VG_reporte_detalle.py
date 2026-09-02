@@ -5,7 +5,7 @@ import logging
 import sys
 import os
 from datetime import datetime
-from services.to_sql import sp_vg_MSV, descargar_tabla, sp_inv
+from services.data_source import sp_vg_MSV, descargar_tabla, sp_inv
 from data.map import map_almacen
 from tools.report_params import ReportParams
 
@@ -313,6 +313,7 @@ def logic(params: ReportParams):
     fecha_final_aa = (fecha_final - pd.DateOffset(years=1) + pd.DateOffset(months=3)).replace(day=1) + pd.offsets.MonthEnd(0)
 
     df_act = sp_vg_MSV(fecha_inicio, fecha_final) #YY-MM-DD
+
     df_aa = sp_vg_MSV(fecha_inicial_aa, fecha_final_aa) #YY-MM-DD
 
     df_act, df_aa, df_inv = _cargar_ventas_e_inventario(fecha_inicio, fecha_final, fecha_inicial_aa, fecha_final_aa)
@@ -331,9 +332,10 @@ def logic(params: ReportParams):
         .drop_duplicates(subset=["codigo", "Almacen2"])
         .rename(columns={"Almacen2": "sucursal"})
     )
+
     df_merge_info = df_merge_info.merge(df_basico_moda, how="left", on=["codigo", "sucursal"], validate="many_to_one")
     df_merge_info = df_merge_info[COLS_SALIDA_DETALLE]
-    # cambio
+
     dfs_por_sucursal = {sucursal: grupo.copy().drop(columns=["mes", "sucursal"]) for sucursal, grupo in df_merge_info.groupby("sucursal")}
 
     df_general = _construir_libro_general(
@@ -368,7 +370,7 @@ def export(dfs: dict, df_g: pd.DataFrame, params: ReportParams) -> None:
     subcarpeta = params.subcarpeta
     ruta_salida = Path(__file__).resolve().parent.parent / "data" / subcarpeta
     ruta_salida.mkdir(parents=True, exist_ok=True)
- 
+
     for sucursal, df_sucursal in dfs.items():
         archivo_excel = ruta_salida / f"{prefijo}{separador}{fecha}{separador}{sucursal}.xlsx"
         exportar_excel(df_sucursal, archivo_excel)
